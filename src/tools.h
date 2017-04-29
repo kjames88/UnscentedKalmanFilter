@@ -21,6 +21,14 @@ public:
   Eigen::VectorXd CalculateRMSE(const std::vector<Eigen::VectorXd> &estimations, const std::vector<Eigen::VectorXd> &ground_truth);
 
   static Eigen::VectorXd PolarToCartesian(Eigen::VectorXd const& polar);
+  static double normalize_angle(double a) {
+    double norm = a;
+    while (norm > M_PI)
+      norm -= (2 * M_PI);
+    while (norm < -M_PI)
+      norm += (2 * M_PI);
+    return norm;
+  }
   
 };
 
