@@ -26,10 +26,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 1.5;
+  std_a_ = 1.75;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.05;
+  std_yawdd_ = 1.0;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -150,9 +150,7 @@ void UKF::Prediction(double delta_t) {
   for (int i=0; i<n_aug_; i++) {
     VectorXd m = sq * A.col(i);
     Xsig.col(1 + i) = x_aug + m;
-    Xsig(3, 1+i) = Tools::normalize_angle(Xsig(3, 1+i));
     Xsig.col(1 + n_aug_ + i) = x_aug - m;
-    Xsig(3, 1+n_aug_+i) = Tools::normalize_angle(Xsig(3, 1+n_aug_+i));
   }
 
   std::cout << "pred Xsig " << std::endl << Xsig << std::endl;
@@ -193,7 +191,6 @@ void UKF::Prediction(double delta_t) {
       dt2 * nu_psi,
       delta_t * nu_psi;
     Xsig_pred_.col(i) = col.head(n_x_) + d + nu;
-    Xsig_pred_(3,i) = Tools::normalize_angle(Xsig_pred_(3,i));
   }
 
   std::cout << "pred Xsig_pred " << std::endl << Xsig_pred_ << std::endl;
@@ -282,18 +279,11 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   // Update state
   VectorXd z_diff = z_meas - z_pred;
   x_ += K * z_diff;
-  x_(3) = Tools::normalize_angle(x_(3));
   P_ -= K * S * K.transpose();
 
   std::cout << "lidar x_ " << std::endl << x_ << std::endl;
   std::cout << "lidar P_ " << std::endl << P_ << std::endl;
 
-
-  assert(x_(3) >= -M_PI && x_(3) <= M_PI);
-  for (int i=0; i<5; i++) {
-    assert(P_(4,i) < 10000);
-  }
-  
   // Compute NIS
   NIS_laser_ = z_diff.transpose() * S_inv * z_diff;
 
@@ -326,7 +316,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     double v = col[2];
     double psi = col[3];
     double rho = sqrt((px * px) + (py * py));
-    double phi = Tools::normalize_angle(atan2(py, px));
+    double phi = atan2(py, px);
     double rho_dot = rho > 0.001 ? ((px * cos(psi) * v) + (py * sin(psi) * v)) / rho : 0;
     VectorXd zcol(n_z);
     zcol << rho, phi, rho_dot;
@@ -341,7 +331,6 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   z_pred.fill(0.0);
   for (int i=0; i < n_sigma_; i++) {
     z_pred += weights_(i) * Zsig.col(i);
-    z_pred(1) = Tools::normalize_angle(z_pred(1));
   }
 
   //  std::cout << "z_pred" << std::endl << z_pred << std::endl;
@@ -379,18 +368,12 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   VectorXd z_diff = z_meas - z_pred;
   z_diff(1) = Tools::normalize_angle(z_diff(1));
   x_ += K * z_diff;
-  x_(3) = Tools::normalize_angle(x_(3));
   P_ -= K * S * K.transpose();
 
   //  std::cout << "radar z_diff" << std::endl << z_diff << std::endl;
   std::cout << "radar x_ " << std::endl << x_ << std::endl;
   std::cout << "radar P_ " << std::endl << P_ << std::endl;
   
-  assert(x_(3) >= -M_PI && x_(3) <= M_PI);
-  for (int i=0; i<5; i++) {
-    assert(P_(4,i) < 10000);
-  }
-
   // Compute NIS
   NIS_radar_ = z_diff.transpose() * S_inv * z_diff;
 
