@@ -24,9 +24,9 @@ public:
   static double normalize_angle(double a) {
     double norm = a;
     while (norm > M_PI)
-      norm -= (2 * M_PI);
+      norm -= (2.0 * M_PI);
     while (norm < -M_PI)
-      norm += (2 * M_PI);
+      norm += (2.0 * M_PI);
     return norm;
   }
   

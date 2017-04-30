@@ -26,10 +26,10 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.25;
+  std_a_ = 1.5;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.25;
+  std_yawdd_ = 0.05;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -84,11 +84,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       meas_x_std << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0, 0, 0;
     }
     x_ = meas_x_std;
-    P_ << 0.3, 0, 0, 0, 0,
-      0, 0.3, 0, 0, 0,
-      0, 0, 0.6, 0, 0,
-      0, 0, 0, 0.6, 0,
-      0, 0, 0, 0, 0.6;
+    P_ << (std_laspx_ * std_laspx_), 0, 0, 0, 0,
+      0, (std_laspy_ * std_laspy_), 0, 0, 0,
+      0, 0, 1.0, 0, 0,
+      0, 0, 0, (std_radphi_ * std_radphi_), 0,
+      0, 0, 0, 0, (std_radrd_ * std_radrd_);
     timestamp_q_ = meas_package.timestamp_;
     is_initialized_ = true;
     return;
@@ -135,6 +135,8 @@ void UKF::Prediction(double delta_t) {
   Pa.fill(0.0);
   Pa.topLeftCorner(n_x_, n_x_) = P_;
   Pa.block<2,2>(n_x_, n_x_) = Q;
+
+  std::cout << "Pa" << std::endl << Pa << std::endl;
   
   // Predict sigma points
   //   Generate sigma points
@@ -147,9 +149,6 @@ void UKF::Prediction(double delta_t) {
   
   for (int i=0; i<n_aug_; i++) {
     VectorXd m = sq * A.col(i);
-
-    assert(m(4) < 1000);
-    
     Xsig.col(1 + i) = x_aug + m;
     Xsig(3, 1+i) = Tools::normalize_angle(Xsig(3, 1+i));
     Xsig.col(1 + n_aug_ + i) = x_aug - m;
@@ -269,7 +268,10 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   MatrixXd T(n_x_, n_z);
   T.fill(0.0);
   for (int i=0; i < n_sigma_; i++) {
-    T += weights_(i) * (Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose();
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    x_diff(3) = Tools::normalize_angle(x_diff(3));
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    T += weights_(i) * x_diff * z_diff.transpose();
   }
   MatrixXd K(n_x_, n_z);
   K = T * S_inv;
@@ -280,14 +282,17 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   // Update state
   VectorXd z_diff = z_meas - z_pred;
   x_ += K * z_diff;
+  x_(3) = Tools::normalize_angle(x_(3));
   P_ -= K * S * K.transpose();
 
   std::cout << "lidar x_ " << std::endl << x_ << std::endl;
   std::cout << "lidar P_ " << std::endl << P_ << std::endl;
 
 
-  for (int i=0; i<5; i++)
-    assert(P_(4,i) < 1000);
+  assert(x_(3) >= -M_PI && x_(3) <= M_PI);
+  for (int i=0; i<5; i++) {
+    assert(P_(4,i) < 10000);
+  }
   
   // Compute NIS
   NIS_laser_ = z_diff.transpose() * S_inv * z_diff;
@@ -336,6 +341,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   z_pred.fill(0.0);
   for (int i=0; i < n_sigma_; i++) {
     z_pred += weights_(i) * Zsig.col(i);
+    z_pred(1) = Tools::normalize_angle(z_pred(1));
   }
 
   //  std::cout << "z_pred" << std::endl << z_pred << std::endl;
@@ -355,7 +361,11 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   MatrixXd T(n_x_, n_z);
   T.fill(0.0);
   for (int i=0; i < n_sigma_; i++) {
-    T += weights_(i) * (Xsig_pred_.col(i) - x_) * (Zsig.col(i) - z_pred).transpose();
+    VectorXd x_diff = Xsig_pred_.col(i) - x_;
+    x_diff(3) = Tools::normalize_angle(x_diff(3));
+    VectorXd z_diff = Zsig.col(i) - z_pred;
+    z_diff(1) = Tools::normalize_angle(z_diff(1));
+    T += weights_(i) * x_diff * z_diff.transpose();
   }
   MatrixXd K(n_x_, n_z);
   K = T * S_inv;
@@ -367,15 +377,19 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   
   // Update state
   VectorXd z_diff = z_meas - z_pred;
+  z_diff(1) = Tools::normalize_angle(z_diff(1));
   x_ += K * z_diff;
+  x_(3) = Tools::normalize_angle(x_(3));
   P_ -= K * S * K.transpose();
 
   //  std::cout << "radar z_diff" << std::endl << z_diff << std::endl;
   std::cout << "radar x_ " << std::endl << x_ << std::endl;
   std::cout << "radar P_ " << std::endl << P_ << std::endl;
   
-  for (int i=0; i<5; i++)
-    assert(P_(4,i) < 1000);
+  assert(x_(3) >= -M_PI && x_(3) <= M_PI);
+  for (int i=0; i<5; i++) {
+    assert(P_(4,i) < 10000);
+  }
 
   // Compute NIS
   NIS_radar_ = z_diff.transpose() * S_inv * z_diff;
