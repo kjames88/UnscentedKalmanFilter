@@ -26,10 +26,15 @@ UKF::UKF() {
   P_ = MatrixXd(5, 5);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
+  //   1.5 is selected from a computed acceleration of 3m/s based on some input data points
+  //   as suggested, the acceleration "max" is divided by 2.  This value represents just one
+  //   example from the data set and is only a sanity value for the magnitude of bicycle acceleration.
   std_a_ = 1.50;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 0.98;
+  //   0.5 is selected experimentally; computed value of 0.09 was a bit too low and
+  //   0.5 performed slightly better than the value of 0.98 that had emerged in previous tuning
+  std_yawdd_ = 0.5;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -84,11 +89,13 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
       meas_x_std << meas_package.raw_measurements_[0], meas_package.raw_measurements_[1], 0, 0, 0;
     }
     x_ = meas_x_std;
-    P_ << (std_radr_ * std_radr_), 0, 0, 0, 0,
-      0, (std_radr_ * std_radr_), 0, 0, 0,
+    // Initialization of covariance is tuned by experiment and using a potentially reasonable
+    //   px,py product of sensor std deviations
+    P_ << (std_laspx_ * std_radr_), 0, 0, 0, 0,
+      0, (std_laspy_ * std_radr_), 0, 0, 0,
       0, 0, 1.1, 0, 0,
-      0, 0, 0, (std_radphi_ * std_radphi_), 0,
-      0, 0, 0, 0, (std_radrd_ * std_radrd_);
+      0, 0, 0, 0.01, 0,
+      0, 0, 0, 0, 0.01;
     timestamp_q_ = meas_package.timestamp_;
     is_initialized_ = true;
     return;
