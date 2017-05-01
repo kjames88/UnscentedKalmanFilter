@@ -337,6 +337,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   
   // Predicted covariance
   MatrixXd S(n_z, n_z);
+  S.fill(0.0);
   for (int i=0; i < n_sigma_; i++) {
     VectorXd d = Zsig.col(i) - z_pred;
     // angle normalization
