@@ -60,6 +60,11 @@ int main(int argc, char* argv[]) {
   string out_file_name_ = argv[2];
   ofstream out_file_(out_file_name_.c_str(), ofstream::out);
 
+  string nis_laser_file_name = "nis_laser.csv";
+  ofstream out_file_nis_laser(nis_laser_file_name.c_str(), ofstream::out);
+  string nis_radar_file_name = "nis_radar.csv";
+  ofstream out_file_nis_radar(nis_radar_file_name.c_str(), ofstream::out);
+
   check_files(in_file_, in_file_name_, out_file_, out_file_name_);
 
   /**********************************************
@@ -180,6 +185,8 @@ int main(int argc, char* argv[]) {
       // NIS value
       out_file_ << ukf.NIS_laser_ << "\t";
 
+      out_file_nis_laser << ukf.NIS_laser_ << ",";
+
       // output the lidar sensor measurement px and py
       out_file_ << measurement_pack_list[k].raw_measurements_(0) << "\t";
       out_file_ << measurement_pack_list[k].raw_measurements_(1) << "\t";
@@ -190,6 +197,8 @@ int main(int argc, char* argv[]) {
 
       // NIS value
       out_file_ << ukf.NIS_radar_ << "\t";
+
+      out_file_nis_radar << ukf.NIS_radar_ << ",";
 
       // output radar measurement in cartesian coordinates
       float ro = measurement_pack_list[k].raw_measurements_(0);
@@ -226,6 +235,12 @@ int main(int argc, char* argv[]) {
   // close files
   if (out_file_.is_open()) {
     out_file_.close();
+  }
+  if (out_file_nis_laser.is_open()) {
+    out_file_nis_laser.close();
+  }
+  if (out_file_nis_radar.is_open()) {
+    out_file_nis_radar.close();
   }
 
   if (in_file_.is_open()) {
